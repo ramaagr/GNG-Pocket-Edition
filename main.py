@@ -66,9 +66,7 @@ def extract_airport_info(file_path):
 
     if sct_entries_folder is None:
         print("sct not found")
-
-    if labels_folder is None:
-        print("Labels not found")
+        return
 
     # Iterate through ICAO named folders'
     FIR_SCT_folder=sct_entries_folder.findall('.//kml:Folder[kml:name]',ns)
@@ -103,6 +101,7 @@ def extract_region_info(file_path):
 
     if regions_folder is None:
         print("Regions not found")
+        return
 
     FIR_regions_folder = regions_folder.findall('.//kml:Folder[kml:name]',ns)
     for icao_folder in FIR_regions_folder[1:]:
@@ -120,9 +119,40 @@ def extract_region_info(file_path):
             region_info.append((icao, description, coordinates))
     return region_info
 
+def extract_label_info(file_path):
+    label_info = []
+    tree = ET.parse(file_path)
+    root = tree.getroot()
+
+    ns = {'kml': 'http://www.opengis.net/kml/2.2'}
+    Labels_folder = root.find('.//kml:Folder[kml:name="Labels"]',ns)
+
+    if Labels_folder is None:
+        print("Labels not found")
+        return 
+
+    FIR_Labels_folder = Labels_folder.findall('.//kml:Folder[kml:name]',ns)
+    for icao_folder in FIR_Labels_folder[1:]:
+
+        icao = icao_folder.find('kml:name', ns).text
+        if icao=="GroundLayout":
+            continue
+
+        labels_folder = icao_folder.find('.//kml:Folder[kml:name="Pins"]',ns)
+        if labels_folder is None:
+            continue
+
+        for place in labels_folder.findall('.//kml:Placemark', ns):
+            name = place.find('.//kml:name',ns).text
+            lon = place.find('.//kml:longitude',ns).text
+            lat = place.find('.//kml:latitude',ns).text
+            label_info.append((icao, name, lon, lat))
+    return label_info
+
 file_path = 'vecf-final.kml'
 airport_info = extract_airport_info(file_path)
 region_info = extract_region_info(file_path)
+labels_info = extract_label_info(file_path)
 
 with open('output_sct.txt','w',encoding='utf-8') as f:
     write_str='[GEO]\n'
@@ -159,3 +189,13 @@ with open('output_reg.txt','w',encoding='utf-8') as f:
             write_str+=lat+' '+lon+'\n   '
     f.write(write_str)
 
+with open('output_lab.txt','w',encoding='utf-8') as f:
+    write_str='[FREETEXT]\n'
+    prev=''
+    for icao,name,lon,lat in labels_info:
+        if icao!=prev:
+            write_str+='\n;--------------freetext---------------\n'
+            prev=icao
+        lat,lon = convert_dd_to_dms(lat,lon)
+        write_str+=lat+':'+lon+':'+icao+':'+name+'\n'
+    f.write(write_str)
