@@ -62,13 +62,11 @@ def extract_airport_info(file_path):
 
     # Find the SCT Entries folder
     sct_entries_folder = root.find('.//kml:Folder[kml:name="SCT Entries"]', ns)
-    regions_folder = root.find('.//kml:Folder[kml:name="Regions"]',ns)
     labels_folder = root.find('.//kml:Folder[kml:name="Labels"]',ns)
 
     if sct_entries_folder is None:
         print("sct not found")
-    if regions_folder is None:
-        print("Regions not found")
+
     if labels_folder is None:
         print("Labels not found")
 
@@ -95,8 +93,36 @@ def extract_airport_info(file_path):
 
     return airport_info
 
+def extract_region_info(file_path):
+    region_info = []
+    tree = ET.parse(file_path)
+    root = tree.getroot()
+
+    ns = {'kml': 'http://www.opengis.net/kml/2.2'}
+    regions_folder = root.find('.//kml:Folder[kml:name="Regions"]',ns)
+
+    if regions_folder is None:
+        print("Regions not found")
+
+    FIR_regions_folder = regions_folder.findall('.//kml:Folder[kml:name]',ns)
+    for icao_folder in FIR_regions_folder[1:]:
+
+        icao = icao_folder.find('kml:name',ns).text
+        if icao=="GroundLayout":
+            continue
+
+        groundlayouts_folder = icao_folder.find('.//kml:Folder[kml:name="GroundLayout"]',ns)
+        if groundlayouts_folder is None:
+            continue
+        for place in groundlayouts_folder.findall('.//kml:Placemark', ns):
+            description = place.find('.//kml:description', ns).text
+            coordinates = place.find('.//kml:coordinates', ns).text
+            region_info.append((icao, description, coordinates))
+    return region_info
+
 file_path = 'vecf-final.kml'
 airport_info = extract_airport_info(file_path)
+region_info = extract_region_info(file_path)
 
 with open('output_sct.txt','w',encoding='utf-8') as f:
     write_str='[GEO]\n'
@@ -109,9 +135,27 @@ with open('output_sct.txt','w',encoding='utf-8') as f:
             prev=icao
             write_str+=icao+' '
         coordinate=coordinates.split(' ')
-        for i in coordinate:
-            lat,lon=convert_dd_to_dms(i.split(',')[0],i.split(',')[1])
-            write_str+=lat+' '+lon+' COLOR_'+description+'\n'
+        lat,lon=convert_dd_to_dms(coordinate[0].split(',')[0],coordinate[0].split(',')[1])
+        for i in coordinate[1:]:
+            lat1,lon1=convert_dd_to_dms(i.split(',')[0],i.split(',')[1])
+            write_str+=lat+' '+lon+' '+lat1+' '+lon1+' COLOR_'+description+'\n'
+            lat=lat1
+            lon=lon1
     f.write(write_str)
         
-            
+with open('output_reg.txt','w',encoding='utf-8') as f:
+    write_str='[regions]\n'
+
+    prev=''
+    
+    for icao,description,coordinates in region_info:
+        if icao!=prev:
+            write_str+='\n;--------------regions---------------\n'
+            prev=icao
+        write_str+='\nREGIONNAME '+icao+' GroundLayout\nCOLOR_'+description+'      '
+        for i in coordinates.strip().split(' '):
+            j = i.split(',')
+            lat,lon=convert_dd_to_dms(i.split(',')[0],i.split(',')[1])
+            write_str+=lat+' '+lon+'\n   '
+    f.write(write_str)
+
