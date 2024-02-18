@@ -8,16 +8,15 @@ def dms_from_dd(decimal_degrees_str):
     remaining_seconds = (remaining_minutes - minutes) * 60
     seconds = int(remaining_seconds)
     fractions_of_seconds = int((remaining_seconds - seconds) * 1000)
-    minutes=str(minutes)
-    seconds=str(seconds)
-    fractions_of_seconds=str(fractions_of_seconds)
-    if len(minutes)<2:
-        for i in range(2-len(minutes)):
-            minutes='0'+minutes
-    if len(seconds)<2:
-        for i in range(2-len(seconds)):
-            seconds='0'+seconds
-    return degrees, minutes, seconds, fractions_of_seconds
+    
+    # Ensure fractions_of_seconds is in 3 digits
+    fractions_of_seconds_str = str(fractions_of_seconds).zfill(3)
+    
+    minutes = str(minutes).zfill(2)
+    seconds = str(seconds).zfill(2)
+
+    return degrees, minutes, seconds, fractions_of_seconds_str
+
 
 def convert_dd_to_dms(lat,lon): # give in string formats
     lat_dat=dms_from_dd(lat)
